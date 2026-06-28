@@ -12,7 +12,7 @@ export async function forwardToOpenAI(
 
   try {
     if (config.isMockMode) {
-      return simulateMockLlm(body);
+      return simulateMockLlm(body, config.mockLlmDelayMs);
     }
 
     const start = performance.now();

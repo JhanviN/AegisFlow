@@ -18,6 +18,8 @@ export function resolveMockMode(): boolean {
   return process.env.MOCK_LLM_MODE === "true" || isApiKeyMissing;
 }
 
+export type PiiMaskMode = "ml" | "regex";
+
 export interface Config {
   port: number;
   redisUrl: string;
@@ -26,6 +28,8 @@ export interface Config {
   openaiApiKey: string;
   openaiBaseUrl: string;
   isMockMode: boolean;
+  piiMaskMode: PiiMaskMode;
+  mockLlmDelayMs: number;
   apiKeys: Set<string>;
   rateLimitRpm: number;
   idempotencyTtlSeconds: number;
@@ -36,6 +40,7 @@ export interface Config {
 export function loadConfig(): Config {
   const apiKeysRaw = process.env.API_KEYS ?? "dev-api-key-1";
   const isMockMode = resolveMockMode();
+  const piiMaskMode = process.env.PII_MASK_MODE === "regex" ? "regex" : "ml";
 
   return {
     port: parseInt(process.env.PORT ?? "3000", 10),
@@ -45,6 +50,8 @@ export function loadConfig(): Config {
     openaiApiKey: process.env.OPENAI_API_KEY ?? "",
     openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
     isMockMode,
+    piiMaskMode,
+    mockLlmDelayMs: parseInt(process.env.MOCK_LLM_DELAY_MS ?? "25", 10),
     apiKeys: new Set(apiKeysRaw.split(",").map((k) => k.trim()).filter(Boolean)),
     rateLimitRpm: parseInt(process.env.RATE_LIMIT_RPM ?? "6000", 10),
     idempotencyTtlSeconds: parseInt(process.env.IDEMPOTENCY_TTL_SECONDS ?? "60", 10),

@@ -59,6 +59,23 @@ export async function maskWithFallback(
   config: Config,
   text: string,
 ): Promise<{ maskedText: string; mapping: Record<string, string>; engine: string; entitiesFound: number }> {
+  if (config.piiMaskMode === "regex") {
+    const fallback = regexMaskPii(text);
+    if (!verifyStructuralSafety(fallback.maskedText)) {
+      circuitBreakerOpen.inc();
+      throw new MlInferenceError(
+        "Regex PII masking failed structural verification",
+        false,
+      );
+    }
+    return {
+      maskedText: fallback.maskedText,
+      mapping: fallback.mapping,
+      engine: "regex_fast",
+      entitiesFound: fallback.entitiesFound,
+    };
+  }
+
   try {
     const result = await callMlInference(config, text);
     return {

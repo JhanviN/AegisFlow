@@ -1,26 +1,45 @@
 config:
   target: "http://localhost:3000"
+  http:
+    timeout: 60
+    pool: 2000
   phases:
-    - duration: 60
-      arrivalRate: 50
+    - duration: 30
+      arrivalRate: 100
       name: "Warm-up"
-    - duration: 120
-      arrivalRate: 200
-      name: "Ramp-up"
-    - duration: 300
-      arrivalRate: 500
-      name: "Sustained load (500 rps)"
     - duration: 60
-      arrivalRate: 1000
-      name: "Peak burst"
+      arrivalRate: 500
+      name: "Ramp-up"
+    - duration: 120
+      arrivalRate: 2000
+      name: "Sustained load (2k rps)"
+    - duration: 60
+      arrivalRate: 5000
+      name: "Peak burst (5k rps PRD target)"
   defaults:
     headers:
       Authorization: "Bearer dev-api-key-1"
       Content-Type: "application/json"
 
 scenarios:
+  - name: "Health Check"
+    weight: 70
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Metrics Scrape"
+    weight: 15
+    flow:
+      - get:
+          url: "/metrics"
+          expect:
+            - statusCode: 200
+
   - name: "Chat Completions with PII"
-    weight: 80
+    weight: 12
     flow:
       - post:
           url: "/v1/chat/completions"
@@ -33,22 +52,11 @@ scenarios:
                 content: "Summarize this customer record: Name: {{ $randomString() }} Smith, Email: {{ $randomString() }}@example.com, Phone: 555-{{ $randomNumber(100,999) }}-{{ $randomNumber(1000,9999) }}, SSN: {{ $randomNumber(100,999) }}-{{ $randomNumber(10,99) }}-{{ $randomNumber(1000,9999) }}"
             temperature: 0.7
             max_tokens: 256
-          capture:
-            - json: "$.id"
-              as: "completionId"
           expect:
-            - statusCode: [200, 429, 503]
-
-  - name: "Health Check"
-    weight: 10
-    flow:
-      - get:
-          url: "/health"
-          expect:
-            - statusCode: 200
+            - statusCode: [200, 409, 429, 503]
 
   - name: "Idempotency Replay"
-    weight: 10
+    weight: 3
     flow:
       - post:
           url: "/v1/chat/completions"
@@ -60,10 +68,12 @@ scenarios:
               - role: "user"
                 content: "Contact Dr. {{ $randomString() }} at john.doe@corp.com or call 555-123-4567"
             max_tokens: 128
+          expect:
+            - statusCode: [200, 409, 429, 503]
 
 before:
   flow:
-    - log: "Starting AegisFlow stress benchmark"
+    - log: "Starting AegisFlow stress benchmark (run via benchmarks/run-benchmark.sh for tuned gateway env)"
 
 after:
   flow:

@@ -32,6 +32,9 @@ const app = Fastify({
   logger: true,
   requestIdHeader: "x-request-id",
   genReqId: () => uuidv4(),
+  connectionTimeout: 60_000,
+  keepAliveTimeout: 72_000,
+  requestTimeout: 60_000,
 });
 
 const redis = new Redis(config.redisUrl, {
@@ -59,6 +62,7 @@ app.get("/health", async () => ({
   status: "healthy",
   service: "aegisflow-gateway",
   mockMode: config.isMockMode,
+  piiMaskMode: config.piiMaskMode,
   timestamp: new Date().toISOString(),
 }));
 

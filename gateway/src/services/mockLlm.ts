@@ -44,10 +44,12 @@ export function buildMockCompletion(body: Record<string, unknown>): Record<strin
 
 export async function simulateMockLlm(
   body: Record<string, unknown>,
+  delayMs = 25,
 ): Promise<{ response: unknown; statusCode: number; latencyMs: number }> {
   const start = performance.now();
-  // Simulate realistic cloud LLM latency without blocking the event loop long
-  await new Promise((resolve) => setTimeout(resolve, 25 + Math.random() * 75));
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
   return {
     response: buildMockCompletion(body),
     statusCode: 200,

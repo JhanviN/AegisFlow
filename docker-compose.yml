@@ -114,8 +114,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       MOCK_LLM_MODE: ${MOCK_LLM_MODE:-true}
+      MOCK_LLM_DELAY_MS: ${MOCK_LLM_DELAY_MS:-25}
+      PII_MASK_MODE: ${PII_MASK_MODE:-ml}
       API_KEYS: ${API_KEYS:-dev-api-key-1,dev-api-key-2}
-      RATE_LIMIT_RPM: 6000
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-6000}
       IDEMPOTENCY_TTL_SECONDS: 60
       TX_MAP_TTL_SECONDS: 60
       ML_TIMEOUT_MS: 5000
