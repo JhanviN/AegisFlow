@@ -153,6 +153,7 @@ _engine: PiiMaskingEngine | None = None
 
 def get_engine() -> PiiMaskingEngine:
     global _engine
+    
     if _engine is None:
         _engine = PiiMaskingEngine()
     return _engine
