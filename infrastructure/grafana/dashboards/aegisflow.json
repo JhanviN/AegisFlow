@@ -1,0 +1,182 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(aegisflow_http_request_duration_seconds_bucket{route=\"/v1/chat/completions\"}[5m])) by (le))",
+          "legendFormat": "p95 Gateway Overhead"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(aegisflow_http_request_duration_seconds_bucket{route=\"/v1/chat/completions\"}[5m])) by (le))",
+          "legendFormat": "p99 Gateway Overhead"
+        }
+      ],
+      "title": "Gateway Endpoint Latency (p95 / p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(rate(aegisflow_http_requests_total[5m])) by (status_code)",
+          "legendFormat": "{{status_code}}"
+        }
+      ],
+      "title": "Request Rate by Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "rate(aegisflow_redis_cache_hits_total[5m]) / (rate(aegisflow_redis_cache_hits_total[5m]) + rate(aegisflow_redis_cache_misses_total[5m]))",
+          "legendFormat": "Hit Rate"
+        },
+        {
+          "expr": "rate(aegisflow_redis_cache_misses_total[5m]) / (rate(aegisflow_redis_cache_hits_total[5m]) + rate(aegisflow_redis_cache_misses_total[5m]))",
+          "legendFormat": "Miss Rate"
+        }
+      ],
+      "title": "Redis Cache Hit / Miss Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "redis_evicted_keys_total",
+          "legendFormat": "Evicted Keys"
+        },
+        {
+          "expr": "redis_keyspace_keys",
+          "legendFormat": "Total Keys"
+        }
+      ],
+      "title": "Redis Eviction & Key Count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "kafka_consumergroup_lag_sum{consumergroup=\"compliance-worker-group\"}",
+          "legendFormat": "Consumer Lag"
+        },
+        {
+          "expr": "kafka_topic_partition_current_offset{topic=\"raw-audit-events\"}",
+          "legendFormat": "Log End Offset - {{partition}}"
+        }
+      ],
+      "title": "Kafka Log End Offsets & Consumer Lag",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(aegisflow_ml_inference_calls_total[5m])) by (status)",
+          "legendFormat": "ML {{status}}"
+        },
+        {
+          "expr": "sum(rate(aegisflow_regex_fallback_total[5m]))",
+          "legendFormat": "Regex Fallback"
+        },
+        {
+          "expr": "sum(rate(aegisflow_circuit_breaker_open_total[5m]))",
+          "legendFormat": "Circuit Breaker Open"
+        }
+      ],
+      "title": "ML Inference & Fallback Metrics",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(aegisflow_pipeline_stage_duration_seconds_bucket[5m])) by (le, stage))",
+          "legendFormat": "p95 {{stage}}"
+        }
+      ],
+      "title": "Pipeline Stage Latency Breakdown",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["aegisflow", "compliance"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AegisFlow Compliance Proxy",
+  "uid": "aegisflow-main",
+  "version": 1
+}

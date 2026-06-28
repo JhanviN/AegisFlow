@@ -1,0 +1,118 @@
+Product Requirement Document (PRD)
+Project Name: AegisFlow
+1. Executive Summary & Strategic Goals
+AegisFlow is a high-throughput, low-latency distributed compliance proxy designed to sit between internal corporate applications and third-party Large Language Model (LLM) providers like OpenAI.
+
+Core Value Proposition
+The system intercepts outgoing prompt traffic, strips or masks Personally Identifiable Information (PII) locally in real-time using lightweight machine learning, forwards the sanitized data to the cloud LLM, and transparently rehydrates the model's response before returning it to the user. All transactional metadata is safely archived via an asynchronous event streaming pipeline for auditability.
+
+Production Engineering Intent
+This project explicitly enforces senior-level architectural constraints (rate-limiting, strict state caching, idempotency, horizontal scalability, and comprehensive observability) to demonstrate production-grade backend competence.
+
+2. Tech Stack Blueprint (The Locked Stack)
+To avoid context-switching overhead and maximize development velocity, the tech stack is strictly locked to two language environments:
+
+Ingestion Plane & Event Workers: Node.js (TypeScript). Selected for type-safe tracking of multi-tenant payloads, fast asynchronous I/O event handling, and high-performance throughput.
+
+ML Inference Plane: Python (FastAPI). Selected strictly as an isolated, lightweight wrapper surrounding native C-extended NLP and tokenization libraries.
+
+Infrastructure Layer (Dockerized Containers):
+
+Apache Kafka & Zookeeper: High-performance asynchronous messaging backbone.
+
+Redis: Fast, in-memory cache handling rate-limiting, idempotency validation, and ephemeral state rehydration.
+
+PostgreSQL: Relational datastore for persistent, SOC 2 compliant audit trails.
+
+Prometheus & Grafana: Infrastructure telemetry, tracing, and metric collection.
+
+3. Core Architectural Components
+                +--------------------------------------------------+
+                |               API Ingestion Gateway              |
+                |                  (TypeScript)                    |
+                +----+-------------------+--------------------+----+
+                     |                   |                    ^
+    1. Authenticate  |                   | 2. Sync            | 5. Sync
+    & Validate       |                   |    Mask Call       |    Rehydrate
+                     v                   v                    |
+              +------+------+    +-------+-------+     +------+------+
+              |    Redis    |    |  ML Inference |     | OpenAI API  |
+              |  Idempotency|    |    (Python)   |     |  (Cloud)    |
+              +-------------+    +---------------+     +-------------+
+                     |
+                     | 6. Async Fire-and-Forget
+                     v
+              +-------------+
+              | Apache Kafka| ---> [Compliance Worker] ---> [PostgreSQL]
+              +-------------+
+Component A: API Ingestion Gateway (TypeScript / Node.js)
+Interface: Exposes a standard secure REST API mimicking standard LLM payloads.
+
+Responsibilities: Enforces ingestion-side middleware (Authentication, Rate-Limiting, Idempotency Checks), orchestrates internal network data flows, handles the external cloud LLM connection, and streams transactional metadata into the messaging tier.
+
+Component B: ML Inference Engine (Python / FastAPI)
+Interface: Internal HTTP or gRPC endpoint called exclusively by the Ingestion Gateway.
+
+Responsibilities: Leverages Microsoft Presidio along with an open-weights Hugging Face Named Entity Recognition (NER) token classification model (distilbert-base-uncased-finetuned-conll03-ner) running locally on the container's CPU/GPU to perform deterministic string sanitization.
+
+Component C: Event Streaming Backbone (Apache Kafka)
+Topic raw-audit-events: Ingests non-blocking transaction telemetry and cryptographic audit payloads forwarded from the Ingestion Gateway.
+
+Topic dlq-compliance-errors: A Dead Letter Queue (DLQ). Any event message failing downstream consumer compilation or database serialization routes directly here with runtime exceptions appended to message headers for future manual review.
+
+Component D: Compliance & Auditing Worker (TypeScript / Node.js)
+Responsibilities: Operates as a persistent Kafka consumer pulling payloads from raw-audit-events. It calculates immutable cryptographic signatures (SHA-256) of transaction entries and writes batch records directly to PostgreSQL.
+
+4. End-to-End Lifecycles (The Request-Response Patches)
+The Synchronous Hot Path (Token Substitution & Rehydration)
+Plaintext
+[Client Prompt] -> [Ingestion Gateway]
+                      │
+                      ├──> Check Redis for Idempotency Key & Rate-Limits
+                      ├──> Send Raw Prompt to ML Inference Engine
+                      │       └─> Local NER Masks PII -> Returns [Masked Text + Mapping Object]
+                      │
+                      ├──> Save Mapping Object to Redis (Key: "tx_map:{Idempotency_Key}", TTL: 60s)
+                      ├──> Forward Anonymized Prompt to OpenAI API
+                      │       └─> Cloud LLM processes and responds using masked labels
+                      │
+                      ├──> Fetch Mapping Object from Redis
+                      ├──> Swap masked labels back to their original plain-text values
+                      │
+                      └──> Return Fully Rehydrated, Clean Response to Client
+The Asynchronous Background Path (Audit & Compliance)
+Immediately following the final response dispatch to the client, the Ingestion Gateway emits an asynchronous event packet containing transaction metadata, execution latencies, and message hashes to Kafka's raw-audit-events topic.
+
+The background Compliance Worker consumes this message, appends the immutable structural schema signature, and commits the records to PostgreSQL entirely decoupled from the synchronous HTTP request loop.
+
+5. Non-Functional Performance & Failure Resilience
+Exactly-Once Processing (Idempotency Middleware)
+Clients submitting requests must include a unique Idempotency-Key header. The Ingestion Gateway executes a pipeline check against Redis:
+
+If the key exists and matches an "In-Flight" status, the client receives a retry-backoff flag or a cached response.
+
+If the key is unique, it registers a tracking reference in Redis with a 60-second expiration lifecycle, guaranteeing that network-level packet retries cannot drop duplicate events onto the Kafka backbone.
+
+Circuit Breaking & System Degradation
+If the local ML Inference Service reaches critical thread exhaustion or crashes entirely:
+
+The Ingestion Gateway intercepts the socket timeout.
+
+The request drops cleanly out of the standard pipeline and maps to the local fallback Regex matching array.
+
+If structural verification fails or processing remains unsafe, the gateway returns an immediate HTTP 503 Service Unavailable error, blocking un-sanitized client prompts from slipping past the corporate perimeter.
+
+6. Verification and Telemetry Definition of Done
+To safely "lock" the codebase and declare the project complete, the repository must explicitly implement the following observability layers:
+
+Complete Grafana/Prometheus Dashboards
+The docker-compose.yml environment must spin up working metric-exporters revealing system status under load:
+
+p95 and p99 Endpoint Latency (Targeting less than 25ms internal gateway overhead).
+
+Redis Cache Eviction & Hit Rates.
+
+Kafka Log-End Offsets and Consumer Lag (Proving background workers process logs cleanly without queuing indefinitely).
+
+Automated Stress Benchmarks
+The codebase must include a modular execution folder containing an Artillery or Locust simulation file capable of pushing a sustained baseline workload of 5,000 requests per second across the proxy endpoints using mock PII inputs. Performance charts verifying system resilience during these stress cycles must be committed directly to the repository's README.md.

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: AegisFlow
+    orgId: 1
+    folder: AegisFlow
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,70 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 50
+      name: "Warm-up"
+    - duration: 120
+      arrivalRate: 200
+      name: "Ramp-up"
+    - duration: 300
+      arrivalRate: 500
+      name: "Sustained load (500 rps)"
+    - duration: 60
+      arrivalRate: 1000
+      name: "Peak burst"
+  defaults:
+    headers:
+      Authorization: "Bearer dev-api-key-1"
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Chat Completions with PII"
+    weight: 80
+    flow:
+      - post:
+          url: "/v1/chat/completions"
+          headers:
+            Idempotency-Key: "{{ $uuid }}"
+          json:
+            model: "gpt-4o-mini"
+            messages:
+              - role: "user"
+                content: "Summarize this customer record: Name: {{ $randomString() }} Smith, Email: {{ $randomString() }}@example.com, Phone: 555-{{ $randomNumber(100,999) }}-{{ $randomNumber(1000,9999) }}, SSN: {{ $randomNumber(100,999) }}-{{ $randomNumber(10,99) }}-{{ $randomNumber(1000,9999) }}"
+            temperature: 0.7
+            max_tokens: 256
+          capture:
+            - json: "$.id"
+              as: "completionId"
+          expect:
+            - statusCode: [200, 429, 503]
+
+  - name: "Health Check"
+    weight: 10
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Idempotency Replay"
+    weight: 10
+    flow:
+      - post:
+          url: "/v1/chat/completions"
+          headers:
+            Idempotency-Key: "replay-test-{{ $randomNumber(1,100) }}"
+          json:
+            model: "gpt-4o-mini"
+            messages:
+              - role: "user"
+                content: "Contact Dr. {{ $randomString() }} at john.doe@corp.com or call 555-123-4567"
+            max_tokens: 128
+
+before:
+  flow:
+    - log: "Starting AegisFlow stress benchmark"
+
+after:
+  flow:
+    - log: "Benchmark complete — export results with: artillery report benchmarks/results/report.json"

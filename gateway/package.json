@@ -1,0 +1,28 @@
+{
+  "name": "aegisflow-gateway",
+  "version": "1.0.0",
+  "description": "AegisFlow API Ingestion Gateway - compliance proxy for LLM traffic",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "fastify": "^4.25.2",
+    "@fastify/cors": "^9.0.1",
+    "ioredis": "^5.3.2",
+    "kafkajs": "^2.2.4",
+    "prom-client": "^15.1.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/uuid": "^9.0.7",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
