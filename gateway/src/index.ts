@@ -24,6 +24,10 @@ import {
 
 const config = loadConfig();
 
+if (config.isMockMode) {
+  console.log("⚠️ AegisFlow running in COMPLIANCE MOCK MODE. Cloud LLM calls will be simulated.");
+}
+
 const app = Fastify({
   logger: true,
   requestIdHeader: "x-request-id",
@@ -54,6 +58,7 @@ app.addHook("onResponse", async (request, reply) => {
 app.get("/health", async () => ({
   status: "healthy",
   service: "aegisflow-gateway",
+  mockMode: config.isMockMode,
   timestamp: new Date().toISOString(),
 }));
 
@@ -187,7 +192,9 @@ async function start(): Promise<void> {
   try {
     await initKafkaProducer(config.kafkaBrokers);
     await app.listen({ port: config.port, host: "0.0.0.0" });
-    app.log.info(`AegisFlow Gateway listening on port ${config.port}`);
+    app.log.info(
+      `AegisFlow Gateway listening on port ${config.port}${config.isMockMode ? " (COMPLIANCE MOCK MODE)" : ""}`,
+    );
   } catch (err) {
     app.log.error(err);
     process.exit(1);

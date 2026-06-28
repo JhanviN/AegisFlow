@@ -111,8 +111,9 @@ services:
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
       ML_INFERENCE_URL: http://ml-inference:8000
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-mock-key-for-dev}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      MOCK_LLM_MODE: ${MOCK_LLM_MODE:-true}
       API_KEYS: ${API_KEYS:-dev-api-key-1,dev-api-key-2}
       RATE_LIMIT_RPM: 6000
       IDEMPOTENCY_TTL_SECONDS: 60

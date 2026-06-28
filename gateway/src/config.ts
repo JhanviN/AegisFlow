@@ -1,3 +1,23 @@
+const PLACEHOLDER_KEY_MARKERS = [
+  "your-actual-key",
+  "your-openai-api-key",
+  "sk-mock-key",
+  "sk-your",
+  "replace-me",
+  "changeme",
+];
+
+export function isOpenAiKeyMissing(apiKey: string | undefined): boolean {
+  if (!apiKey?.trim()) return true;
+  const normalized = apiKey.toLowerCase();
+  return PLACEHOLDER_KEY_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+export function resolveMockMode(): boolean {
+  const isApiKeyMissing = isOpenAiKeyMissing(process.env.OPENAI_API_KEY);
+  return process.env.MOCK_LLM_MODE === "true" || isApiKeyMissing;
+}
+
 export interface Config {
   port: number;
   redisUrl: string;
@@ -5,6 +25,7 @@ export interface Config {
   mlInferenceUrl: string;
   openaiApiKey: string;
   openaiBaseUrl: string;
+  isMockMode: boolean;
   apiKeys: Set<string>;
   rateLimitRpm: number;
   idempotencyTtlSeconds: number;
@@ -14,6 +35,8 @@ export interface Config {
 
 export function loadConfig(): Config {
   const apiKeysRaw = process.env.API_KEYS ?? "dev-api-key-1";
+  const isMockMode = resolveMockMode();
+
   return {
     port: parseInt(process.env.PORT ?? "3000", 10),
     redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
@@ -21,6 +44,7 @@ export function loadConfig(): Config {
     mlInferenceUrl: process.env.ML_INFERENCE_URL ?? "http://localhost:8000",
     openaiApiKey: process.env.OPENAI_API_KEY ?? "",
     openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+    isMockMode,
     apiKeys: new Set(apiKeysRaw.split(",").map((k) => k.trim()).filter(Boolean)),
     rateLimitRpm: parseInt(process.env.RATE_LIMIT_RPM ?? "6000", 10),
     idempotencyTtlSeconds: parseInt(process.env.IDEMPOTENCY_TTL_SECONDS ?? "60", 10),

@@ -1,13 +1,20 @@
 import { Config } from "../config";
 import { pipelineStageDuration } from "../metrics";
+import { simulateMockLlm } from "./mockLlm";
 
 export async function forwardToOpenAI(
   config: Config,
   body: Record<string, unknown>,
 ): Promise<{ response: unknown; statusCode: number; latencyMs: number }> {
-  const endTimer = pipelineStageDuration.startTimer({ stage: "openai" });
+  const endTimer = pipelineStageDuration.startTimer({
+    stage: config.isMockMode ? "openai_mock" : "openai",
+  });
 
   try {
+    if (config.isMockMode) {
+      return simulateMockLlm(body);
+    }
+
     const start = performance.now();
     const response = await fetch(`${config.openaiBaseUrl}/chat/completions`, {
       method: "POST",
