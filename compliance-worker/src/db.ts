@@ -123,7 +123,7 @@ export async function insertDlqRecord(
   headers: Record<string, string>,
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO dlq_events (topic, partition_id, offset, error_message, payload, headers)
+    `INSERT INTO dlq_events (topic, partition_id, message_offset, error_message, payload, headers)
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [topic, partition, offset, errorMessage, JSON.stringify(payload), JSON.stringify(headers)],
   );

@@ -15,7 +15,7 @@ from transformers import pipeline
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = os.getenv("MODEL_NAME", "distilbert-base-uncased-finetuned-conll03-ner")
+MODEL_NAME = os.getenv("MODEL_NAME", "elastic/distilbert-base-uncased-finetuned-conll03-english")
 LABEL_PREFIX = "AEGIS_"
 
 

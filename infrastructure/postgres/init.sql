@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS dlq_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     topic VARCHAR(128) NOT NULL,
     partition_id INTEGER,
-    offset BIGINT,
+    message_offset BIGINT,
     error_message TEXT,
     payload JSONB,
     headers JSONB,

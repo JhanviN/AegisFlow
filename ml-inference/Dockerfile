@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir \
 
 # Pre-download NER model at build time (retry on flaky networks)
 RUN for i in 1 2 3; do \
-      python -c "from transformers import pipeline; pipeline('ner', model='distilbert-base-uncased-finetuned-conll03-ner', aggregation_strategy='simple')" \
+      python -c "from transformers import pipeline; pipeline('ner', model='elastic/distilbert-base-uncased-finetuned-conll03-english', aggregation_strategy='simple')" \
       && break || sleep 10; \
     done
 

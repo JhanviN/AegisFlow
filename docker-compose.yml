@@ -73,7 +73,7 @@ services:
     networks:
       - aegisflow
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aegisflow -d aegisflow_audit:5432"]
+      test: ["CMD-SHELL", "pg_isready -U aegisflow -d aegisflow_audit"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -85,7 +85,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MODEL_NAME: distilbert-base-uncased-finetuned-conll03-ner
+      MODEL_NAME: elastic/distilbert-base-uncased-finetuned-conll03-english
       LOG_LEVEL: info
     networks:
       - aegisflow
