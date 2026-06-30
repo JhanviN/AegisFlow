@@ -6,26 +6,39 @@ AegisFlow intercepts outgoing prompt traffic, strips or masks PII locally in rea
 
 ## Architecture
 
+Synchronous hot path (per request) and asynchronous audit path:
+
 ```
-                +--------------------------------------------------+
-                |               API Ingestion Gateway              |
-                |                  (TypeScript)                    |
-                +----+-------------------+--------------------+----+
-                     |                   |                    ^
-    1. Authenticate  |                   | 2. Sync            | 5. Sync
-    & Validate       |                   |    Mask Call       |    Rehydrate
-                     v                   v                    |
-              +------+------+    +-------+-------+     +------+------+
-              |    Redis    |    |  ML Inference |     | OpenAI API  |
-              |  Idempotency|    |    (Python)   |     |  (Cloud)    |
-              +-------------+    +---------------+     +-------------+
-                     |
-                     | 6. Async Fire-and-Forget
-                     v
-              +-------------+
-              | Apache Kafka| ---> [Compliance Worker] ---> [PostgreSQL]
-              +-------------+
+                         [ Corporate Client ]
+                                  |
+                                  | HTTPS  /v1/chat/completions
+                                  v
++---------------------------------------------------------------------+
+|                    API Ingestion Gateway (TypeScript)               |
+|                                                                     |
+|  (1) Auth · Rate-limit · Idempotency ──────────────────> Redis       |
+|  (2) Sync PII mask ──────────────────────────────────> ML Inference |
+|  (3) Store tx_map ───────────────────────────────────> Redis       |
+|  (4) Forward sanitized prompt ───────────────────────> OpenAI API  |
+|  (5) Fetch tx_map · Rehydrate response <────────────── Redis       |
+|  (6) Return rehydrated response to client                           |
+|  (7) Async audit event (fire-and-forget) ────────────> Kafka        |
++---------------------------------------------------------------------+
+                                  |
+                                  |  (async, decoupled from HTTP loop)
+                                  v
+                    +---------------------------+
+                    |   Compliance Worker (TS)  |
+                    |   SHA-256 · batch write   |
+                    +-------------+-------------+
+                                  v
+                             PostgreSQL
+                          (audit_events)
+
+Topics: raw-audit-events  |  dlq-compliance-errors (on failure)
 ```
+
+**Notes:** Redis is not a separate hop in the business logic — the gateway uses it for idempotency, rate limiting, and ephemeral PII mappings (`tx_map:{key}`, 60s TTL). ML Inference is an internal service called only by the gateway. Prometheus and Grafana scrape metrics locally; they are not on the request hot path.
 
 ## Tech Stack
 
@@ -186,6 +199,54 @@ Measured with `./benchmarks/run-benchmark.sh` (Artillery, 0 failures):
 | Error Rate | < 0.1% | **0%** |
 
 Workload mix: ~70% `/health`, ~15% `/metrics`, ~15% `/v1/chat/completions` (with mock PII).
+
+## Production Deployment Architecture (AWS)
+
+The `docker-compose` stack is for **local validation and benchmarking**. Production maps each service to managed AWS components while keeping the same logical flow as the diagram above.
+
+```
+                    [ Route 53 + ACM TLS ]
+                              |
+                              v
+                   Application Load Balancer
+                              |
+              +---------------+---------------+
+              |                               |
+              v                               v
+     ECS/Fargate Service              ECS/Fargate Service
+     (gateway — TypeScript)          (ml-inference — Python)
+     public via ALB                  internal only (Service Connect / Cloud Map)
+              |                               ^
+              |         VPC private subnets   |
+              +-------+-------+-------+-------+
+                      |       |       |
+                      v       v       v
+              ElastiCache   MSK     RDS PostgreSQL
+              (Redis)     (Kafka)   (Multi-AZ audit)
+                      |
+                      v
+              ECS/Fargate Service
+              (compliance-worker — TypeScript)
+                      |
+                      v
+                 RDS PostgreSQL
+
+Observability: Amazon Managed Prometheus + Amazon Grafana (or CloudWatch Container Insights)
+Secrets: AWS Secrets Manager (OPENAI_API_KEY, API_KEYS, DB credentials)
+```
+
+| Local (compose) | AWS (production) | Role |
+|-----------------|------------------|------|
+| `gateway` | **ECS Fargate** or **EKS** behind **ALB** | Public ingestion, orchestration, mock/LLM forwarding |
+| `ml-inference` | **ECS Fargate** (CPU/GPU task) | Internal-only PII masking; scale independently of gateway |
+| `compliance-worker` | **ECS Fargate** or **EKS** Deployment | Kafka consumer → RDS; scale on consumer lag |
+| Kafka + Zookeeper | **Amazon MSK** | `raw-audit-events`, `dlq-compliance-errors`; multi-AZ |
+| Redis | **Amazon ElastiCache (Redis)** | Idempotency, rate limits, `tx_map` TTL state |
+| PostgreSQL | **Amazon RDS (PostgreSQL)** Multi-AZ | Immutable `audit_events` / `dlq_events` |
+| Prometheus + Grafana | **AMP + AMG** or **CloudWatch** | Dashboards, p95/p99, Kafka lag, Redis hit rate |
+| `.env` secrets | **Secrets Manager** + task IAM roles | No keys in images or task definitions |
+
+**Scaling guidance:** Autoscale gateway tasks on ALB request count / CPU; scale ML tasks on mask latency or queue depth; scale compliance workers on MSK consumer lag (`compliance-worker-group`). MSK and ElastiCache should be multi-AZ. RDS uses automated backups and encryption at rest for SOC 2 retention requirements.
 
 ## Project Structure
 
