@@ -116,3 +116,5 @@ Kafka Log-End Offsets and Consumer Lag (Proving background workers process logs 
 
 Automated Stress Benchmarks
 The codebase must include a modular execution folder containing an Artillery or Locust simulation file capable of pushing a sustained baseline workload of 5,000 requests per second across the proxy endpoints using mock PII inputs. Performance charts verifying system resilience during these stress cycles must be committed directly to the repository's README.md.
+
+docker compose up -d --build
