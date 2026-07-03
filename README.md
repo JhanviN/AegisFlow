@@ -264,3 +264,7 @@ AegisFlow/
 ## License
 
 MIT
+
+## Author
+
+**Jhanvi Nagori** 
